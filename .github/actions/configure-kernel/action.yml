@@ -35,8 +35,10 @@ runs:
           CONFIG_HW_RANDOM_VIRTIO \
           CONFIG_VIRTIO_DMA_SHARED_BUFFER \
           CONFIG_SND_VIRTIO \
-          CONFIG_VIRTIO_VSOCKETS \
-          CONFIG_VIRTIO_VSOCKETS_COMMON \
+          # NOTE: virtio-vsock must stay modular; forcing =y breaks kernel_aarch64_dist
+          # (dist expects net/vmw_vsock/vmw_vsock_virtio_transport.ko).
+          # CONFIG_VIRTIO_VSOCKETS \
+          # CONFIG_VIRTIO_VSOCKETS_COMMON \
           CONFIG_GOLDFISH \
           CONFIG_GOLDFISH_PIPE \
           CONFIG_GOLDFISH_ADDRESS_SPACE \
