@@ -16,7 +16,8 @@ runs:
 
         # Only add configs that exist in Kconfig - check before adding
         KERNEL_SRC="${{ github.workspace }}/kernel/common"
-        echo "# AVD virtio built-in configs" > "$FRAG"
+        # Append (do not truncate): setup-ksu already wrote CONFIG_KSU=y into this fragment
+        echo "# AVD virtio built-in configs" >> "$FRAG"
 
         # Check each config exists in Kconfig before adding to fragment
         for cfg in \
@@ -51,6 +52,9 @@ runs:
             echo "  Skipped (not in Kconfig): ${cfg}"
           fi
         done
+
+        # Safety: make sure KernelSU stays enabled no matter what
+        grep -qxF 'CONFIG_KSU=y' "$FRAG" || echo 'CONFIG_KSU=y' >> "$FRAG"
 
         echo "=== Final GKI Fragment ==="
         cat "$FRAG"
