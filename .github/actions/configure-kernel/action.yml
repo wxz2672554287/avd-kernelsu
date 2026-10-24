@@ -20,6 +20,9 @@ runs:
         echo "# AVD virtio built-in configs" >> "$FRAG"
 
         # Check each config exists in Kconfig before adding to fragment
+        # NOTE: CONFIG_VIRTIO_VSOCKETS* are intentionally NOT forced to =y --
+        # kernel_aarch64_dist expects net/vmw_vsock/vmw_vsock_virtio_transport.ko
+        # to stay a module, otherwise the build fails packaging the dist.
         for cfg in \
           CONFIG_VIRTIO \
           CONFIG_VIRTIO_PCI \
@@ -35,10 +38,6 @@ runs:
           CONFIG_HW_RANDOM_VIRTIO \
           CONFIG_VIRTIO_DMA_SHARED_BUFFER \
           CONFIG_SND_VIRTIO \
-          # NOTE: virtio-vsock must stay modular; forcing =y breaks kernel_aarch64_dist
-          # (dist expects net/vmw_vsock/vmw_vsock_virtio_transport.ko).
-          # CONFIG_VIRTIO_VSOCKETS \
-          # CONFIG_VIRTIO_VSOCKETS_COMMON \
           CONFIG_GOLDFISH \
           CONFIG_GOLDFISH_PIPE \
           CONFIG_GOLDFISH_ADDRESS_SPACE \
