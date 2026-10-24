@@ -1,5 +1,5 @@
 name: 'Configure Kernel Options'
-description: 'Force virtio drivers as built-in for AVD compatibility'
+description: 'Prepare the GKI fragment (KernelSU on, GKI defaults kept)'
 
 inputs:
   kernel_version:
@@ -9,53 +9,23 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Create GKI fragment with built-in virtio drivers
+    - name: Prepare GKI fragment
       shell: bash
       run: |
         FRAG="${{ github.workspace }}/gki.fragment"
-
-        # Only add configs that exist in Kconfig - check before adding
         KERNEL_SRC="${{ github.workspace }}/kernel/common"
-        # Append (do not truncate): setup-ksu already wrote CONFIG_KSU=y into this fragment
-        echo "# AVD virtio built-in configs" >> "$FRAG"
 
-        # Check each config exists in Kconfig before adding to fragment
-        # NOTE: CONFIG_VIRTIO_VSOCKETS* are intentionally NOT forced to =y --
-        # kernel_aarch64_dist expects net/vmw_vsock/vmw_vsock_virtio_transport.ko
-        # to stay a module, otherwise the build fails packaging the dist.
-        for cfg in \
-          CONFIG_VIRTIO \
-          CONFIG_VIRTIO_PCI \
-          CONFIG_VIRTIO_PCI_LEGACY \
-          CONFIG_VIRTIO_MMIO \
-          CONFIG_VIRTIO_BLK \
-          CONFIG_VIRTIO_NET \
-          CONFIG_VIRTIO_CONSOLE \
-          CONFIG_VIRTIO_INPUT \
-          CONFIG_VIRTIO_BALLOON \
-          CONFIG_VIRTIO_MEM \
-          CONFIG_DRM_VIRTIO_GPU \
-          CONFIG_HW_RANDOM_VIRTIO \
-          CONFIG_VIRTIO_DMA_SHARED_BUFFER \
-          CONFIG_SND_VIRTIO \
-          CONFIG_GOLDFISH \
-          CONFIG_GOLDFISH_PIPE \
-          CONFIG_GOLDFISH_ADDRESS_SPACE \
-          CONFIG_DM_VERITY \
-          CONFIG_EROFS_FS \
-        ; do
-          # Strip CONFIG_ prefix to get Kconfig symbol name
-          SYM="${cfg#CONFIG_}"
-          if grep -rq "^config $SYM$" "$KERNEL_SRC" 2>/dev/null; then
-            echo "${cfg}=y" >> "$FRAG"
-            echo "  Added: ${cfg}=y"
-          else
-            echo "  Skipped (not in Kconfig): ${cfg}"
-          fi
-        done
-
-        # Safety: make sure KernelSU stays enabled no matter what
+        # Do NOT force CONFIG_VIRTIO_*=y here.
+        # The GKI build verifies its own module_outs (drivers/virtio/*.ko,
+        # drivers/block/virtio_blk.ko, drivers/char/virtio_console.ko, ...), so
+        # forcing those drivers built-in makes //common:kernel_<arch> fail with
+        # "Unable to find ... .ko". AVD support comes from the virtual-device
+        # dist target (//common-modules/virtual-device:virtual_device_<arch>_dist),
+        # which ships the Image plus the virtio/goldfish .ko set for the ramdisk.
+        #
+        # setup-ksu already appended CONFIG_KSU=y to this fragment; keep it.
         grep -qxF 'CONFIG_KSU=y' "$FRAG" || echo 'CONFIG_KSU=y' >> "$FRAG"
+        echo "# AVD: GKI defaults kept, KernelSU built in" >> "$FRAG"
 
         echo "=== Final GKI Fragment ==="
         cat "$FRAG"

@@ -202,22 +202,16 @@ jobs:
               VIRT_TARGET="//common-modules/virtual-device:virtual_device_aarch64_dist"
             fi
 
-            # Build kernel
-            tools/bazel build \
+            # AVD needs the *virtual device* target, not plain GKI: its dist carries
+            # the Image plus the virtio/goldfish module set the emulator requires.
+            # (Building //common:kernel_<arch>_dist first is pointless and fails when
+            # virtio is forced built-in, because GKI module_outs expect .ko files.)
+            tools/bazel run \
               --config=fast \
               --lto=thin \
               --defconfig_fragment=${DEFCONFIG_FRAG} \
-              ${KERNEL_TARGET} || exit 1
-
-            # Build virtual device modules for AVD
-            if [ "${{ inputs.build_modules }}" = "true" ]; then
-              tools/bazel run \
-                --config=fast \
-                --lto=thin \
-                --defconfig_fragment=${DEFCONFIG_FRAG} \
-                ${VIRT_TARGET} \
-                -- --dist_dir=dist_virt || echo "WARNING: Virtual device modules build failed"
-            fi
+              ${VIRT_TARGET} \
+              -- --dist_dir=dist_virt || exit 1
           fi
 
       - name: Prepare Artifacts
@@ -251,19 +245,26 @@ jobs:
           # 2. Check Bazel output (fallback)
           if [ ! -f "$OUT_DIR/bzImage" ] && [ ! -f "$OUT_DIR/Image" ]; then
             echo "No build.sh output found, checking Bazel..."
-            if [ "$ARCH" = "x86_64" ]; then
-              BAZEL_OUT="$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_x86_64"
-              cp "$BAZEL_OUT/bzImage" "$OUT_DIR/" 2>/dev/null || true
-            else
-              BAZEL_OUT="$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_aarch64"
-              cp "$BAZEL_OUT/Image" "$OUT_DIR/" 2>/dev/null || true
-            fi
-            # Bazel virtual device dist
+            # Virtual device dist is authoritative: it ships the matching Image
+            # plus the full module set for the emulator.
             VIRT_DIST="$GITHUB_WORKSPACE/kernel/dist_virt"
             if [ -d "$VIRT_DIST" ]; then
+              echo "=== dist_virt contents ==="
+              ls "$VIRT_DIST" | head -30
+              cp "$VIRT_DIST"/Image "$OUT_DIR/" 2>/dev/null || true
+              cp "$VIRT_DIST"/bzImage "$OUT_DIR/" 2>/dev/null || true
               cp "$VIRT_DIST"/*.ko "$OUT_DIR/modules/" 2>/dev/null || true
               cp "$VIRT_DIST"/modules.* "$OUT_DIR/modules/" 2>/dev/null || true
               cp "$VIRT_DIST"/system_dlkm* "$OUT_DIR/" 2>/dev/null || true
+            fi
+            if [ ! -f "$OUT_DIR/Image" ] && [ ! -f "$OUT_DIR/bzImage" ]; then
+              if [ "$ARCH" = "x86_64" ]; then
+                BAZEL_OUT="$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_x86_64"
+                cp "$BAZEL_OUT/bzImage" "$OUT_DIR/" 2>/dev/null || true
+              else
+                BAZEL_OUT="$GITHUB_WORKSPACE/kernel/bazel-bin/common/kernel_aarch64"
+                cp "$BAZEL_OUT/Image" "$OUT_DIR/" 2>/dev/null || true
+              fi
             fi
           fi
 
